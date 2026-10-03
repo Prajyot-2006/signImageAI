@@ -6,280 +6,365 @@ function App() {
   const [preview, setPreview] = useState(null);
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
+  const [analyzedImageKey, setAnalyzedImageKey] = useState(null);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
 
-    if (file) {
-      setImage(file);
-      setPreview(URL.createObjectURL(file));
-      setResult("");
-    }
+    if (!file) return;
+
+    const imageKey = `${file.name}-${file.size}-${file.lastModified}`;
+
+    setImage(file);
+    setPreview(URL.createObjectURL(file));
+    setResult("");
+    setAnalyzedImageKey(null);
   };
 
   const analyzeImage = async () => {
     if (!image) return;
 
+    // Prevent another API request for the same image
     const imageKey = `${image.name}-${image.size}-${image.lastModified}`;
 
-    const cachedResult = localStorage.getItem(imageKey);
-
-    if (cachedResult) {
-      setResult(cachedResult);
+    if (analyzedImageKey === imageKey) {
       return;
     }
 
     setLoading(true);
-    setResult("");
 
     try {
       const formData = new FormData();
       formData.append("image", image);
 
-      const response = await fetch("http://localhost:5000/api/analyze", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch(
+        "http://localhost:5000/api/analyze",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
 
       const data = await response.json();
 
-      if (data.result) {
-        setResult(data.result);
-        localStorage.setItem(imageKey, data.result);
-      } else {
-        setResult("Failed to analyze the image.");
+      if (!response.ok) {
+        throw new Error(data.error || "Something went wrong");
       }
+
+      setResult(data.result);
+      setAnalyzedImageKey(imageKey);
     } catch (error) {
       console.error(error);
-      setResult("Failed to analyze the image.");
+      setResult("Unable to analyze the image.");
     } finally {
       setLoading(false);
     }
   };
 
+  const extractResult = (label, nextLabel) => {
+    if (!result) return "Not available";
+
+    const regex = nextLabel
+      ? new RegExp(`${label}\\s*(.*?)(?=\\s*${nextLabel})`, "is")
+      : new RegExp(`${label}\\s*(.*)`, "is");
+
+    return result.match(regex)?.[1]?.trim() || "Not available";
+  };
+
   const possibleSign =
-    result.match(
-      /Possible Sign:\s*(.*?)(?=\s*Meaning:)/
-    )?.[1] || "Unknown";
+    extractResult("Possible Sign:", "Meaning:") || "Unknown";
 
   const meaning =
-    result.match(
-      /Meaning:\s*(.*?)(?=\s*What the person is communicating:)/
-    )?.[1] || "Not available";
+    extractResult("Meaning:", "What the person is communicating:") ||
+    "Not available";
 
   const communication =
-    result.match(
-      /What the person is communicating:\s*(.*)/i
-    )?.[1] || "Not available";
+    extractResult("What the person is communicating:", null) ||
+    "Not available";
 
   return (
     <div className="app">
 
-      {/* Header */}
-      <header className="header">
-        <div className="logo">
-          <span>✦</span> Sign Image AI
+      {/* NAVBAR */}
+      <header className="navbar">
+        <div className="brand">
+          <span className="brand-icon">✦</span>
+          <span>Sign Image AI</span>
         </div>
 
-        <div className="header-badge">
+        <div className="ai-badge">
+          <span>✦</span>
           AI Powered
         </div>
       </header>
 
-      {/* Main */}
-      <main className="main">
+      {/* HERO */}
+      <section className="hero">
 
-        <section className="hero">
-          <p className="eyebrow">SIGN LANGUAGE • AI VISION</p>
+        <div className="eyebrow">
+          SIGN LANGUAGE <span>•</span> AI VISION
+        </div>
 
-          <h1>
-            Understand Sign Language
-            <br />
-            <span>Through Images</span>
-          </h1>
+        <h1>
+          Understand Sign Language
+          <span>Through Images</span>
+        </h1>
 
-          <p className="subtitle">
-            Upload a sign-language gesture and let AI identify
-            its possible meaning and what the person is communicating.
-          </p>
-        </section>
+        <p className="hero-description">
+          Upload a sign-language gesture and let AI identify its
+          possible meaning and what the person is communicating.
+        </p>
 
-        {/* Two Column Layout */}
-        <div className="workspace">
+        {/* FEATURE ROW */}
+        <div className="feature-row">
 
-          {/* LEFT */}
-          <section className="left-panel">
-
-            <div className="panel-title">
-              <div>
-                <h2>Upload Image</h2>
-                <p>Choose a sign-language gesture image.</p>
-              </div>
+          <div className="feature">
+            <div className="feature-icon blue">↥</div>
+            <div>
+              <strong>Upload Image</strong>
+              <small>PNG, JPG, JPEG, WEBP</small>
             </div>
+          </div>
 
-            {!preview ? (
-              <label className="upload-box">
+          <div className="feature">
+            <div className="feature-icon purple">✦</div>
+            <div>
+              <strong>AI Analysis</strong>
+              <small>Powered by Gemini</small>
+            </div>
+          </div>
 
-                <div className="upload-icon">
-                  ↑
-                </div>
+          <div className="feature">
+            <div className="feature-icon blue">✦</div>
+            <div>
+              <strong>Get Meaning</strong>
+              <small>Simple explanation</small>
+            </div>
+          </div>
 
-                <h3>Drop your image here</h3>
+        </div>
+      </section>
 
-                <p>
-                  or choose an image from your computer
-                </p>
+      {/* MAIN WORKSPACE */}
+      <main className="workspace">
 
-                <span className="choose-button">
-                  Choose Image
-                </span>
+        {/* LEFT CARD */}
+        <section className="panel upload-panel">
 
-                <small>
-                  PNG • JPG • JPEG • WEBP
-                </small>
+          <div className="panel-heading">
+            <div className="panel-icon blue">↑</div>
 
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
+            <div>
+              <h2>Upload Image</h2>
+              <p>Choose a sign-language gesture image.</p>
+            </div>
+          </div>
+
+          {!preview ? (
+            <label className="drop-zone">
+
+              <div className="upload-cloud">↑</div>
+
+              <h3>Upload your image</h3>
+
+              <p>
+                Click here to choose a sign-language image
+              </p>
+
+              <span className="choose-button">
+                Choose Image
+              </span>
+
+              <small>
+                PNG • JPG • JPEG • WEBP
+              </small>
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+              />
+
+            </label>
+          ) : (
+            <div className="image-preview-container">
+
+              <div className="image-preview">
+                <img
+                  src={preview}
+                  alt="Selected sign"
                 />
+              </div>
 
-              </label>
-            ) : (
-              <div className="selected-image">
-
-                <div className="image-container">
-                  <img
-                    src={preview}
-                    alt="Selected sign"
-                  />
-                </div>
-
-                <div className="image-name">
-                  {image?.name}
-                </div>
+              <div className="file-info">
+                <span>▧</span>
+                <span>{image?.name}</span>
 
                 <button
-                  className="analyze-button"
-                  onClick={analyzeImage}
-                  disabled={loading}
+                  className="remove-button"
+                  onClick={() => {
+                    setImage(null);
+                    setPreview(null);
+                    setResult("");
+                    setAnalyzedImageKey(null);
+                  }}
                 >
-                  {loading ? (
-                    <>
-                      <span className="spinner"></span>
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      ✦ Analyze Sign
-                    </>
-                  )}
+                  ×
                 </button>
-
-                <label className="change-image">
-                  Choose another image
-
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                  />
-                </label>
-
               </div>
+
+            </div>
+          )}
+
+          <button
+            className="analyze-button"
+            onClick={analyzeImage}
+            disabled={!image || loading}
+          >
+            {loading ? (
+              <>
+                <span className="spinner"></span>
+                Analyzing...
+              </>
+            ) : (
+              <>
+                ✦ Analyze Sign
+              </>
             )}
+          </button>
 
-          </section>
+          {preview && (
+            <label className="change-image">
+              ↻ Choose another image
 
-          {/* RIGHT */}
-          <section className="right-panel">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+              />
+            </label>
+          )}
 
-            <div className="panel-title">
-              <div>
-                <h2>AI Interpretation</h2>
-                <p>
-                  Results generated from your uploaded image.
-                </p>
-              </div>
+        </section>
+
+        {/* RIGHT CARD */}
+        <section className="panel result-panel">
+
+          <div className="panel-heading result-heading">
+
+            <div className="panel-icon purple">✦</div>
+
+            <div>
+              <h2>AI Interpretation</h2>
+              <p>
+                Results generated from your uploaded image.
+              </p>
             </div>
 
-            {!result && !loading && (
-              <div className="empty-result">
+            <div className="status">
+              <span></span>
+              {loading ? "Analyzing" : "Ready"}
+            </div>
 
-                <div className="empty-icon">
-                  ✦
+          </div>
+
+          {!result ? (
+            <div className="empty-result">
+
+              <div className="empty-icon">✦</div>
+
+              <h3>Waiting for an image</h3>
+
+              <p>
+                Upload a sign-language image and click
+                <strong> Analyze Sign </strong>
+                to see the AI interpretation.
+              </p>
+
+            </div>
+          ) : (
+            <div className="results">
+
+              {/* POSSIBLE SIGN */}
+              <div className="result-card primary-result">
+
+                <div className="result-card-icon purple">
+                  ▣
                 </div>
 
-                <h3>Waiting for an image</h3>
+                <div className="result-content">
 
-                <p>
-                  Upload a sign image and click
-                  <strong> Analyze Sign </strong>
-                  to see the AI interpretation.
-                </p>
-
-              </div>
-            )}
-
-            {loading && (
-              <div className="empty-result">
-
-                <div className="loading-circle">
-                  ✦
-                </div>
-
-                <h3>Analyzing image...</h3>
-
-                <p>
-                  AI is analyzing the sign. Please wait.
-                </p>
-
-              </div>
-            )}
-
-            {result && !loading && (
-              <div className="results">
-
-                <div className="result-card highlight">
                   <span className="result-label">
                     POSSIBLE SIGN
                   </span>
 
                   <h3>{possibleSign}</h3>
+
                 </div>
 
-                <div className="result-card">
+              </div>
+
+              {/* MEANING */}
+              <div className="result-card">
+
+                <div className="result-card-icon blue">
+                  □
+                </div>
+
+                <div className="result-content">
+
                   <span className="result-label">
                     MEANING
                   </span>
 
                   <p>{meaning}</p>
+
                 </div>
 
-                <div className="result-card">
+              </div>
+
+              {/* COMMUNICATION */}
+              <div className="result-card">
+
+                <div className="result-card-icon purple">
+                  ●
+                </div>
+
+                <div className="result-content">
+
                   <span className="result-label">
                     WHAT THE PERSON IS COMMUNICATING
                   </span>
 
                   <p>{communication}</p>
-                </div>
 
-                <div className="disclaimer">
-                  ⚠️ AI-generated interpretation. Sign meanings
-                  can vary by sign language and context.
                 </div>
 
               </div>
-            )}
 
-          </section>
+              {/* WARNING */}
+              <div className="result-warning">
 
-        </div>
+                <span>⚠</span>
+
+                <p>
+                  AI-generated interpretation. Sign meanings
+                  can vary by sign language and context.
+                </p>
+
+              </div>
+
+            </div>
+          )}
+
+        </section>
 
       </main>
 
+      {/* FOOTER */}
       <footer>
-        Sign Image AI • AI-assisted sign-language image interpretation
+        Sign Image AI <span>•</span> AI-assisted sign-language
+        image interpretation
       </footer>
 
     </div>
